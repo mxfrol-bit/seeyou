@@ -112,10 +112,14 @@ class TryOnService:
                     "garment_image": item_image_url,
                     "category": "auto",
                     "nsfw_filter": False,
+                    "mode": "quality",
+                    "garment_photo_type": "auto",
                     "num_inference_steps": 50,
-                    "guidance_scale": 2.5,
+                    "guidance_scale": 2.0,
                     "restore_background": True,
                     "restore_clothes": False,
+                    "adjust_hands": True,
+                    "long_top": False,
                 }
             )
             resp.raise_for_status()
