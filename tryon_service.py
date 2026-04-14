@@ -105,7 +105,7 @@ class TryOnService:
     async def _fal_tryon(self, user_photo_url: str, item_image_url: str) -> str:
         async with httpx.AsyncClient(timeout=180) as client:
             resp = await client.post(
-                f"{FAL_BASE}/fashn/tryon",
+                f"{FAL_BASE}/fal-ai/fashn/tryon/v1.5",
                 headers=_fal_headers(self.fal_key),
                 json={
                     "model_image": user_photo_url,
@@ -120,7 +120,7 @@ class TryOnService:
             )
             resp.raise_for_status()
             job = resp.json()
-            return await self._fal_poll(client, job["status_url"], job["request_id"], "fashn/tryon")
+            return await self._fal_poll(client, job["status_url"], job["request_id"], "fal-ai/fashn/tryon/v1.5")
 
     # ─── FAL face-swap ────────────────────────────────────────────────────────
 
