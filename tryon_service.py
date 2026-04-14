@@ -150,29 +150,31 @@ class TryOnService:
             logger.info(f"[{model}] poll {i+1} status={s.get('status')} keys={list(s.keys())}")
 
             if s.get("status") == "COMPLETED":
-                logger.info(f"[{model}] COMPLETED full response: {s}")
+                logger.info(f"[{model}] COMPLETED, fetching response_url")
+                response_url = s.get("response_url")
+                if not response_url:
+                    raise RuntimeError(f"[{model}] No response_url in status: {s}")
 
-                if "output" in s:
-                    out = s["output"]
-                    if isinstance(out, str): return out
-                    if isinstance(out, list): return out[0]
-                    if isinstance(out, dict):
-                        if "image" in out:
-                            img = out["image"]
-                            return img["url"] if isinstance(img, dict) else img
-                        if "images" in out:
-                            img = out["images"][0]
-                            return img["url"] if isinstance(img, dict) else img
-                        if "url" in out: return out["url"]
+                r = (await client.get(response_url, headers=_fal_headers(self.fal_key))).json()
+                logger.info(f"[{model}] result keys: {list(r.keys()) if isinstance(r, dict) else type(r)}")
 
-                if "image" in s:
-                    img = s["image"]
-                    return img["url"] if isinstance(img, dict) else img
-                if "images" in s:
-                    img = s["images"][0]
-                    return img["url"] if isinstance(img, dict) else img
+                if isinstance(r, dict):
+                    if "image" in r:
+                        img = r["image"]
+                        return img["url"] if isinstance(img, dict) else img
+                    if "images" in r:
+                        img = r["images"][0]
+                        return img["url"] if isinstance(img, dict) else img
+                    if "output" in r:
+                        out = r["output"]
+                        if isinstance(out, str): return out
+                        if isinstance(out, list): return out[0]
+                if isinstance(r, list):
+                    return r[0] if isinstance(r[0], str) else r[0]["url"]
+                if isinstance(r, str):
+                    return r
 
-                raise RuntimeError(f"[{model}] Cannot extract URL. Full response: {s}")
+                raise RuntimeError(f"[{model}] Cannot extract URL from result: {r}")
 
             elif s.get("status") == "FAILED":
                 raise RuntimeError(f"{model} failed: {s.get('error')}")
