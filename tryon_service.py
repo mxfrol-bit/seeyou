@@ -147,32 +147,35 @@ class TryOnService:
         for i in range(max_polls):
             await asyncio.sleep(2)
             s = (await client.get(status_url, headers=_fal_headers(self.fal_key))).json()
+            logger.info(f"[{model}] poll {i+1} status={s.get('status')} keys={list(s.keys())}")
 
             if s.get("status") == "COMPLETED":
-                # Результат может быть прямо в статусе
-                r = s
-                # Или делаем отдельный запрос если нет output в статусе
-                if not any(k in r for k in ("image", "images", "output")):
-                    try:
-                        resp = await client.get(
-                            f"{FAL_BASE}/{model}/requests/{request_id}/response",
-                            headers=_fal_headers(self.fal_key)
-                        )
-                        if resp.status_code == 200:
-                            r = resp.json()
-                    except Exception:
-                        pass
-                if "image" in r:   return r["image"]["url"]
-                if "images" in r:  return r["images"][0]["url"]
-                if "output" in r:
-                    out = r["output"]
-                    return out if isinstance(out, str) else out[0]
-                raise RuntimeError(f"Unknown schema: {list(r.keys())}")
+                logger.info(f"[{model}] COMPLETED full response: {s}")
+
+                if "output" in s:
+                    out = s["output"]
+                    if isinstance(out, str): return out
+                    if isinstance(out, list): return out[0]
+                    if isinstance(out, dict):
+                        if "image" in out:
+                            img = out["image"]
+                            return img["url"] if isinstance(img, dict) else img
+                        if "images" in out:
+                            img = out["images"][0]
+                            return img["url"] if isinstance(img, dict) else img
+                        if "url" in out: return out["url"]
+
+                if "image" in s:
+                    img = s["image"]
+                    return img["url"] if isinstance(img, dict) else img
+                if "images" in s:
+                    img = s["images"][0]
+                    return img["url"] if isinstance(img, dict) else img
+
+                raise RuntimeError(f"[{model}] Cannot extract URL. Full response: {s}")
 
             elif s.get("status") == "FAILED":
                 raise RuntimeError(f"{model} failed: {s.get('error')}")
-
-            logger.debug(f"[{model}] poll {i+1}: {s.get('status')}")
 
         raise TimeoutError(f"{model} timed out")
 
