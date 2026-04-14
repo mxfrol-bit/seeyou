@@ -149,10 +149,19 @@ class TryOnService:
             s = (await client.get(status_url, headers=_fal_headers(self.fal_key))).json()
 
             if s.get("status") == "COMPLETED":
-                r = (await client.get(
-                    f"{FAL_BASE}/{model}/requests/{request_id}/response",
-                    headers=_fal_headers(self.fal_key)
-                )).json()
+                # Результат может быть прямо в статусе
+                r = s
+                # Или делаем отдельный запрос если нет output в статусе
+                if not any(k in r for k in ("image", "images", "output")):
+                    try:
+                        resp = await client.get(
+                            f"{FAL_BASE}/{model}/requests/{request_id}/response",
+                            headers=_fal_headers(self.fal_key)
+                        )
+                        if resp.status_code == 200:
+                            r = resp.json()
+                    except Exception:
+                        pass
                 if "image" in r:   return r["image"]["url"]
                 if "images" in r:  return r["images"][0]["url"]
                 if "output" in r:
@@ -172,9 +181,10 @@ class TryOnService:
     async def _replicate_tryon(self, user_photo_url: str, item_image_url: str) -> str:
         async with httpx.AsyncClient(timeout=180) as client:
             resp = await client.post(
-                "https://api.replicate.com/v1/models/cuuupid/idm-vton/predictions",
+                "https://api.replicate.com/v1/predictions",
                 headers={"Authorization": f"Bearer {self.replicate_token}", "Content-Type": "application/json", "Prefer": "wait=60"},
-                json={"input": {
+                json={"version": "c871bb9b046607b680449ecbae55fd8c6d945e0a1948644bf2361b3d021d3ff4",
+                      "input": {
                     "human_img": user_photo_url,
                     "garm_img": item_image_url,
                     "garment_des": "clothing item",
