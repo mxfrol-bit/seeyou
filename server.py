@@ -1,6 +1,5 @@
 """
 Railway Webhook Server
-Запускается вместо bot.py в продакшн
 """
 import logging
 import os
@@ -14,26 +13,21 @@ from bot import dp, bot
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")   # https://yourapp.up.railway.app
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
 WEBHOOK_PATH = f"/webhook/{os.getenv('TELEGRAM_BOT_TOKEN')}"
 WEBHOOK_URL  = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 PORT = int(os.getenv("PORT", 8080))
 
 
 async def on_startup(app: web.Application):
-    await bot.set_webhook(WEBHOOK_URL)
-    logger.info(f"✅ Webhook: {WEBHOOK_URL}")
-
-
-async def on_shutdown(app: web.Application):
-    await bot.delete_webhook()
-    logger.info("Webhook removed")
+    await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
+    logger.info(f"✅ Webhook set: {WEBHOOK_URL}")
 
 
 def main():
     app = web.Application()
     app.on_startup.append(on_startup)
-    app.on_shutdown.append(on_shutdown)
+    # on_shutdown убран намеренно — не удаляем webhook при редеплое
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp, bot=bot)
     web.run_app(app, host="0.0.0.0", port=PORT)

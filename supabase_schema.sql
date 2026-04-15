@@ -1,7 +1,5 @@
--- ============================================================
--- WB Try-On Bot — Supabase Schema
+-- WB Try-On Bot — Supabase Schema (v2)
 -- Выполни в Supabase → SQL Editor
--- ============================================================
 
 create table if not exists users (
   id           bigserial primary key,
@@ -20,17 +18,16 @@ create table if not exists tryons (
   item_source      text not null check (item_source in ('wb_link', 'photo')),
   tryon_result_url text,
   description      text,
+  rating           int check (rating between 1 and 5),
   status           text not null default 'pending'
                      check (status in ('pending', 'done', 'failed')),
   created_at       timestamptz default now(),
   completed_at     timestamptz
 );
 
--- Индексы для быстрой выборки истории
 create index if not exists tryons_telegram_id_idx on tryons(telegram_id);
 create index if not exists tryons_status_idx      on tryons(status);
 create index if not exists tryons_created_at_idx  on tryons(created_at desc);
 
--- RLS (Row Level Security) — опционально
--- alter table users  enable row level security;
--- alter table tryons enable row level security;
+-- Если таблицы уже есть, добавь только колонку rating:
+-- alter table tryons add column if not exists rating int check (rating between 1 and 5);
