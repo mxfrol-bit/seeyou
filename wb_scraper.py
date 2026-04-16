@@ -39,10 +39,13 @@ class WBScraper:
                     f"https://basket-{basket:02d}.wbbasket.ru"
                     f"/vol{vol}/part{part}/{article}/images/big/1.{ext}"
                 )
-                async with httpx.AsyncClient(timeout=8) as client:
-                    resp = await client.head(img_url)
-                    if resp.status_code == 200:
-                        return img_url
+                try:
+                    async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=3.0)) as client:
+                        resp = await client.head(img_url)
+                        if resp.status_code == 200:
+                            return img_url
+                except Exception:
+                    continue
 
             logger.warning(f"Image not found for article {article}")
             return None
