@@ -13,6 +13,8 @@ from typing import Optional
 
 import httpx
 import anthropic
+from PIL import Image, ImageOps
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,27 @@ FAL_BASE = "https://queue.fal.run"
 def _fal_headers(key: str) -> dict:
     return {"Authorization": f"Key {key}", "Content-Type": "application/json"}
 
+
+
+async def _prepare_model_image(image_url: str) -> str:
+    """
+    Скачивает фото, добавляет padding снизу 20% чтобы ноги не обрезались,
+    возвращает base64 data URL.
+    """
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(image_url)
+        img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+
+    w, h = img.size
+    # Добавляем 20% высоты снизу нейтральным цветом
+    pad = int(h * 0.2)
+    new_img = Image.new("RGB", (w, h + pad), (200, 200, 200))
+    new_img.paste(img, (0, 0))
+
+    buf = io.BytesIO()
+    new_img.save(buf, format="JPEG", quality=95)
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    return f"data:image/jpeg;base64,{b64}"
 
 class TryOnService:
     def __init__(self):
@@ -103,12 +126,13 @@ class TryOnService:
     # ─── FAL fashn/tryon ──────────────────────────────────────────────────────
 
     async def _fal_tryon(self, user_photo_url: str, item_image_url: str) -> str:
+        prepared = await _prepare_model_image(user_photo_url)
         async with httpx.AsyncClient(timeout=180) as client:
             resp = await client.post(
                 f"{FAL_BASE}/fal-ai/fashn/tryon/v1.5",
                 headers=_fal_headers(self.fal_key),
                 json={
-                    "model_image": user_photo_url,
+                    "model_image": prepared,
                     "garment_image": item_image_url,
                     "category": "auto",
                     "nsfw_filter": False,
@@ -120,6 +144,9 @@ class TryOnService:
                     "restore_clothes": False,
                     "adjust_hands": True,
                     "long_top": False,
+                    "cover_feet": False,
+                    "flat_lay": False,
+                    "output_format": "jpeg",
                 }
             )
             resp.raise_for_status()
